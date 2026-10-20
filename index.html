@@ -60,6 +60,12 @@
   .gris{background:#EEF2F0;color:var(--txt)}
   .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#1F2A24;color:#fff;padding:12px 18px;border-radius:12px;font-size:14px;display:none;z-index:30;max-width:90%}
   .gps{font-size:12px;color:var(--suave);text-align:center;margin:-4px 0 12px}
+  .ubi{background:#fff;border:2px solid var(--verde);border-radius:18px;padding:16px;margin-bottom:14px;text-align:center}
+  .ubi .t1{font-weight:700;font-size:16px;color:var(--verde2)}
+  .ubi .t2{font-size:13px;color:var(--suave);margin:6px 0 12px;line-height:1.5}
+  .ubi.mal{border-color:#B3261E}
+  .ubi.mal .t1{color:#B3261E}
+  .ubiok{font-size:12px;color:#0B6A3B;text-align:center;margin:-4px 0 10px;font-weight:600}
 </style>
 </head>
 <body>
@@ -80,6 +86,8 @@
 </div>
 
 <main id="vApp" style="display:none">
+  <div class="ubi" id="ubi" style="display:none"><div class="t1" id="ubiT1">📍 Activa tu ubicación</div><div class="t2" id="ubiT2">La app necesita tu ubicación para registrar dónde inicias la ruta.</div><button class="btn prim" id="bUbi" onclick="permitirUbicacion()">📍 Permitir ubicación</button></div>
+  <div class="ubiok" id="ubiOk" style="display:none">📍 Ubicación activada</div>
   <div class="gps" id="gps"></div>
   <div id="lista"></div>
 </main>
@@ -114,8 +122,8 @@ function ubicacion(){
   return new Promise(res=>{
     if(!navigator.geolocation){ res(null); return; }
     navigator.geolocation.getCurrentPosition(
-      p=>res({lat:p.coords.latitude.toFixed(6), lon:p.coords.longitude.toFixed(6), acc:Math.round(p.coords.accuracy)}),
-      e=>{ $('gps').textContent='⚠️ Activa la ubicación del celular para registrar tu ruta.'; res(null); },
+      p=>{ estadoUbi(true); res({lat:p.coords.latitude.toFixed(6), lon:p.coords.longitude.toFixed(6), acc:Math.round(p.coords.accuracy)}); },
+      e=>{ $('gps').textContent=''; if(e.code===1) estadoUbi(false,'⚠️ Ubicación bloqueada', avisoBloqueo(), '🔄 Reintentar'); else estadoUbi(false,'⚠️ El GPS está apagado','Enciende la ubicación del celular y luego toca Reintentar.', '🔄 Reintentar'); res(null); },
       {enableHighAccuracy:true, timeout:15000, maximumAge:30000});
   });
 }
@@ -129,10 +137,48 @@ async function entrar(){
 }
 function salir(){ guardar('cedula', null); location.reload(); }
 
+
+function estadoUbi(ok, t1, t2, boton){
+  $('ubi').style.display = ok ? 'none' : 'block';
+  $('ubiOk').style.display = ok ? 'block' : 'none';
+  $('ubi').classList.toggle('mal', !!t1);
+  $('ubiT1').textContent = t1 || '📍 Activa tu ubicación';
+  $('ubiT2').textContent = t2 || 'La app necesita tu ubicación para registrar dónde inicias la ruta.';
+  $('bUbi').textContent = boton || '📍 Permitir ubicación';
+  if(ok){ guardar('gpsOk','1'); $('gps').textContent=''; }
+}
+function avisoBloqueo(){
+  const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  return ios ? 'El permiso está bloqueado. Ve a Ajustes › Privacidad › Localización, actívala y permite Safari "Al usarse la app". Luego toca Reintentar.'
+             : 'El permiso está bloqueado. Toca el candado 🔒 junto a la dirección de arriba › Permisos › Ubicación › Permitir. Luego toca Reintentar.';
+}
+function permitirUbicacion(){
+  if(!navigator.geolocation){ estadoUbi(false,'⚠️ Este celular no permite ubicación','Prueba abriendo el link en Chrome o Safari.'); return; }
+  $('bUbi').disabled = true; $('bUbi').textContent = 'Activando…';
+  navigator.geolocation.getCurrentPosition(
+    ()=>{ $('bUbi').disabled=false; estadoUbi(true); toast('✅ Ubicación activada'); },
+    e=>{ $('bUbi').disabled=false; guardar('gpsOk',null);
+      if(e.code===1) estadoUbi(false,'⚠️ Ubicación bloqueada', avisoBloqueo(), '🔄 Reintentar');
+      else estadoUbi(false,'⚠️ El GPS está apagado','Enciende la ubicación del celular (desliza desde arriba y toca "Ubicación") y luego toca Reintentar.', '🔄 Reintentar');
+    },
+    {enableHighAccuracy:true, timeout:15000, maximumAge:60000});
+}
+async function revisarUbicacion(){
+  try{
+    if(navigator.permissions && navigator.permissions.query){
+      const st = await navigator.permissions.query({name:'geolocation'});
+      const aplicar = ()=>{ if(st.state==='granted') estadoUbi(true); else if(st.state==='denied') estadoUbi(false,'⚠️ Ubicación bloqueada', avisoBloqueo(), '🔄 Reintentar'); else estadoUbi(false); };
+      aplicar(); st.onchange = aplicar; return;
+    }
+  }catch(e){}
+  estadoUbi(leer('gpsOk')==='1');
+}
+
 async function mostrarApp(){
   $('vLogin').style.display='none'; $('vApp').style.display='block';
   $('saludo').style.display='block'; $('salir').style.display='inline-block';
   $('nombre').textContent = YO.nombre;
+  revisarUbicacion();
   await cargar();
   setInterval(cargar, 60000);
   document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ cargar(); } });
