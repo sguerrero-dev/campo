@@ -86,7 +86,7 @@
 </div>
 
 <main id="vApp" style="display:none">
-  <div class="ubi" id="ubi" style="display:none"><div class="t1" id="ubiT1">📍 Activa tu ubicación</div><div class="t2" id="ubiT2">La app necesita tu ubicación para registrar dónde inicias la ruta.</div><button class="btn prim" id="bUbi" onclick="permitirUbicacion()">📍 Permitir ubicación</button></div>
+  <div class="ubi" id="ubi" style="display:none"><div class="t1" id="ubiT1">📍 Activa tu ubicación</div><div class="t2" id="ubiT2">Es obligatorio activar la ubicación para ver y trabajar tus tareas.</div><button class="btn prim" id="bUbi" onclick="permitirUbicacion()">📍 Permitir ubicación</button></div>
   <div class="ubiok" id="ubiOk" style="display:none">📍 Ubicación activada</div>
   <div class="gps" id="gps"></div>
   <div id="lista"></div>
@@ -140,10 +140,11 @@ function salir(){ guardar('cedula', null); location.reload(); }
 
 function estadoUbi(ok, t1, t2, boton){
   $('ubi').style.display = ok ? 'none' : 'block';
+  $('lista').style.display = ok ? 'block' : 'none';
   $('ubiOk').style.display = ok ? 'block' : 'none';
   $('ubi').classList.toggle('mal', !!t1);
   $('ubiT1').textContent = t1 || '📍 Activa tu ubicación';
-  $('ubiT2').textContent = t2 || 'La app necesita tu ubicación para registrar dónde inicias la ruta.';
+  $('ubiT2').textContent = t2 || 'Es obligatorio activar la ubicación para ver y trabajar tus tareas.';
   $('bUbi').textContent = boton || '📍 Permitir ubicación';
   if(ok){ guardar('gpsOk','1'); $('gps').textContent=''; }
 }
@@ -236,9 +237,10 @@ function pedir(id, a){
 function cerrarModal(){ $('modal').classList.remove('on'); }
 
 async function accion(id, a, com, fecha){
-  let p = null;
-  if(a==='Iniciar'){ toast('Tomando ubicación…', 6000); p = await ubicacion(); }
-  if(a==='Iniciar' && !p){ toast('No pude tomar tu ubicación. Actívala y vuelve a intentar.', 5000); return; }
+  toast('Verificando ubicación…', 6000);
+  const pos = await ubicacion();
+  if(!pos){ toast('⚠️ Debes tener la ubicación activa para continuar.', 5000); window.scrollTo(0,0); return; }
+  const p = a==='Iniciar' ? pos : null;
   try{
     TAREAS = await api('cambiarEstado', YO.cedula, id, a, p?p.lat:'', p?p.lon:'', p?p.acc:'', com||'', fecha||'');
     pintar(); toast(a==='Iniciar' ? 'Ruta iniciada ✔' : 'Guardado ✔');
