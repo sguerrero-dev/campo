@@ -150,7 +150,7 @@ function estadoUbi(ok, t1, t2, boton){
 }
 function avisoBloqueo(){
   const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-  return ios ? 'El permiso está bloqueado. Ve a Ajustes › Privacidad › Localización, actívala y permite Safari "Al usarse la app". Luego toca Reintentar.'
+  return ios ? '1) Ajustes › Privacidad y seguridad › Localización: actívala y en "Sitios web de Safari" elige "Al usar la app". 2) En Safari toca el ícono a la izquierda de la dirección › Configuración del sitio web › Ubicación › Permitir. Luego toca Reintentar.'
              : 'El permiso está bloqueado. Toca el candado 🔒 junto a la dirección de arriba › Permisos › Ubicación › Permitir. Luego toca Reintentar.';
 }
 function permitirUbicacion(){
@@ -165,14 +165,14 @@ function permitirUbicacion(){
     {enableHighAccuracy:true, timeout:15000, maximumAge:60000});
 }
 async function revisarUbicacion(){
+  estadoUbi(false,'','Activando tu ubicación… toca "Permitir" cuando el celular lo pregunte.','Activando…');
+  permitirUbicacion();
   try{
     if(navigator.permissions && navigator.permissions.query){
       const st = await navigator.permissions.query({name:'geolocation'});
-      const aplicar = ()=>{ if(st.state==='granted') estadoUbi(true); else if(st.state==='denied') estadoUbi(false,'⚠️ Ubicación bloqueada', avisoBloqueo(), '🔄 Reintentar'); else estadoUbi(false); };
-      aplicar(); st.onchange = aplicar; return;
+      st.onchange = ()=>{ if(st.state==='granted') estadoUbi(true); else permitirUbicacion(); }; return;
     }
   }catch(e){}
-  estadoUbi(leer('gpsOk')==='1');
 }
 
 async function mostrarApp(){
@@ -182,7 +182,7 @@ async function mostrarApp(){
   revisarUbicacion();
   await cargar();
   setInterval(cargar, 60000);
-  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ cargar(); } });
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ cargar(); if($('ubi').style.display!=='none') permitirUbicacion(); } });
 }
 
 async function cargar(){
